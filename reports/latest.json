@@ -1,7 +1,7 @@
 {
   "date": "2026-08-10",
   "repo": "Saullo-Programador/Agente_Security",
-  "summary": "A análise automatizada de segurança identificou um total de três achados, todos classificados como de severidade alta e concentrados na categoria de dependências vulneráveis em Python. Não há ocorrências críticas ou urgentes no momento, mas os riscos identificados envolvem potenciais vazamentos de credenciais e negação de serviço através do arquivo requirements.txt. O maior risco reside na biblioteca requests, que apresenta vulnerabilidades que podem expor dados sensíveis ou permitir ataques locais caso funções específicas sejam acionadas. Como recomendação objetiva, a prioridade imediata deve ser a atualização das bibliotecas requests e protobuf para as versões corrigidas indicadas nos relatórios para eliminar a exposição conhecida.",
+  "summary": "Foram identificados tres achados de seguranca no repositorio, todos classificados como de severidade alta e oriundos de ferramentas de analise de dependencias. A categoria que concentra todo o risco atual e a de dependencias vulneraveis em bibliotecas Python utilizadas no projeto. Embora nao existam vulnerabilidades criticas ou vazamentos de segredos imediatos, as falhas envolvem a biblioteca requests e o pacote protobuf. A recomendacao objetiva e atualizar imediatamente o arquivo requirements.txt, subindo a versao da biblioteca requests para 2.33.0 ou superior e corrigindo as versoes do protobuf conforme as recomendacoes dos fabricantes para eliminar o risco de exposicao de credenciais e ataques de negacao de servico.",
   "findings": [
     {
       "tool": "pip-audit",
