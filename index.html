@@ -89,6 +89,46 @@
   .subtitle { color: var(--muted); font-size: 14.5px; max-width: 460px; }
   .subtitle strong { color: var(--text); font-weight: 600; }
 
+  .run-box {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin-bottom: 28px;
+  }
+  .run-box .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 10px;
+  }
+  .run-row { display: flex; gap: 8px; }
+  .run-row input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+  }
+  .run-row input::placeholder { color: var(--muted); }
+  .run-row input:focus { outline: 1px solid var(--accent); }
+  .run-row button {
+    background: var(--accent);
+    color: #1a0a0a;
+    border: none;
+    border-radius: 8px;
+    padding: 0 16px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 13.5px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .run-row button:hover { filter: brightness(1.08); }
+  .run-hint { font-size: 12.5px; color: var(--muted); margin: 10px 0 0; min-height: 1.4em; }
+
   .summary-box {
     background: var(--panel);
     border: 1px solid var(--panel-border);
@@ -163,6 +203,15 @@
       <p class="subtitle" id="subtitle">Carregando a última varredura…</p>
     </header>
 
+    <div class="run-box">
+      <div class="label">Auditar outro repositório</div>
+      <div class="run-row">
+        <input id="repo-input" type="text" placeholder="https://github.com/usuario/repositorio" />
+        <button id="run-btn">Preparar varredura</button>
+      </div>
+      <p class="run-hint" id="run-hint">Cola o link, copiamos pra você e já abrimos a tela certa do Actions — só colar e clicar em "Run workflow".</p>
+    </div>
+
     <div class="summary-box" id="summary-box" style="display:none">
       <div class="label">Resumo executivo</div>
       <div id="summary-text"></div>
@@ -182,6 +231,30 @@
 
 <script>
   const CATEGORY_ORDER = ["Segredo exposto", "Dependencia vulneravel", "Codigo inseguro (SAST)"];
+
+  document.getElementById('run-btn').addEventListener('click', () => {
+    const input = document.getElementById('repo-input');
+    const hint = document.getElementById('run-hint');
+    const url = input.value.trim();
+
+    if (!/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/.test(url)) {
+      hint.textContent = 'Cole um link válido, ex: https://github.com/usuario/repositorio';
+      hint.style.color = 'var(--sev-critica)';
+      return;
+    }
+
+    navigator.clipboard?.writeText(url).catch(() => {});
+
+    // Deduz owner/repo deste proprio site (paginas de projeto do GitHub Pages
+    // seguem sempre o padrao https://<owner>.github.io/<repo>/)
+    const owner = location.hostname.split('.')[0];
+    const repoPath = location.pathname.split('/').filter(Boolean)[0] || '';
+    const actionsUrl = `https://github.com/${owner}/${repoPath}/actions/workflows/security-scan.yml`;
+
+    hint.innerHTML = 'Link copiado ✓ — abrindo o Actions. Clique em <strong>Run workflow</strong> e cole no campo <strong>repo_url</strong>.';
+    hint.style.color = 'var(--muted)';
+    window.open(actionsUrl, '_blank', 'noopener');
+  });
 
   function fmtDate(iso) {
     const d = new Date(iso + "T00:00:00");
