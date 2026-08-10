@@ -1,4 +1,4 @@
-# radar-seguranca 🛡️📡
+# Radar Seguranca 🛡️📡
 
 Agente que audita a segurança de um repositório automaticamente, a cada
 `push`, `pull request` e semanalmente — sem precisar de servidor, tudo
