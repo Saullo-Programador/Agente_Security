@@ -1,0 +1,108 @@
+name: Radar de Seguranca
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # 09:00 UTC toda segunda = 06:00 em Brasilia
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      repo_url:
+        description: "URL de um repositorio publico do GitHub para auditar (deixe vazio para auditar este repositorio)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  varredura:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do repositorio (historico completo, necessario para o gitleaks)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Definir o que sera escaneado
+        id: scandir
+        run: |
+          if [ -n "${{ github.event.inputs.repo_url }}" ]; then
+            echo "dir=target" >> "$GITHUB_OUTPUT"
+            echo "label=${{ github.event.inputs.repo_url }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "dir=." >> "$GITHUB_OUTPUT"
+            echo "label=${{ github.repository }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Clonar repositorio alvo (somente se um link foi informado)
+        if: github.event.inputs.repo_url != ''
+        run: git clone --quiet "${{ github.event.inputs.repo_url }}" target
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Instalar dependencias do agente
+        run: pip install -r requirements.txt
+
+      # ---------- Gitleaks: segredos vazados no historico do git ----------
+      - name: Instalar gitleaks
+        run: |
+          GITLEAKS_VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | grep '"tag_name"' | cut -d '"' -f4)
+          VERSION_NUM="${GITLEAKS_VERSION#v}"
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/${GITLEAKS_VERSION}/gitleaks_${VERSION_NUM}_linux_x64.tar.gz" -o gitleaks.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo mv gitleaks /usr/local/bin/
+          gitleaks version
+
+      - name: Rodar gitleaks
+        run: gitleaks detect --source "${{ steps.scandir.outputs.dir }}" --report-format json --report-path gitleaks-report.json --no-banner || true
+
+      # ---------- Semgrep: analise estatica de codigo (SAST) ----------
+      - name: Rodar semgrep
+        run: semgrep --config=auto --json --output=semgrep-report.json "${{ steps.scandir.outputs.dir }}" || true
+
+      # ---------- Dependencias vulneraveis (Python) ----------
+      - name: Rodar pip-audit
+        run: |
+          REQ_FILE=$(find "${{ steps.scandir.outputs.dir }}" -name "requirements.txt" | head -n 1)
+          if [ -n "$REQ_FILE" ]; then
+            pip-audit -r "$REQ_FILE" -f json -o pip-audit-report.json || true
+          fi
+
+      # ---------- Dependencias vulneraveis (Node) ----------
+      - name: Rodar npm audit
+        run: |
+          PKG_JSON=$(find "${{ steps.scandir.outputs.dir }}" -name package.json -not -path '*/node_modules/*' | head -n 1)
+          if [ -n "$PKG_JSON" ]; then
+            PKG_DIR=$(dirname "$PKG_JSON")
+            (cd "$PKG_DIR" && npm install --package-lock-only --ignore-scripts >/dev/null 2>&1) || true
+            (cd "$PKG_DIR" && npm audit --json > "$GITHUB_WORKSPACE/npm-audit-report.json") || true
+          fi
+
+      # ---------- Agregar + IA prioriza e traduz ----------
+      - name: Agregar achados
+        run: python scripts/aggregate.py
+
+      - name: Resumir com IA e montar relatorio
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          REPO_LABEL: ${{ steps.scandir.outputs.label }}
+        run: python scripts/summarize.py
+
+      - name: Commitar relatorio no repositorio
+        if: github.event_name != 'pull_request'
+        run: |
+          git config user.name "radar-seguranca-bot"
+          git config user.email "actions@github.com"
+          git add reports/
+          git diff --staged --quiet || git commit -m "Relatorio de seguranca $(date -u +%Y-%m-%d)"
+          git push
+
+      - name: Falhar o job se houver achado critico
+        run: python scripts/gate.py

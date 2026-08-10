@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.env
+gitleaks-report.json
+semgrep-report.json
+pip-audit-report.json
+npm-audit-report.json
+findings.json
