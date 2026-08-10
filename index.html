@@ -15,10 +15,10 @@
     --panel-border: #1f2b45;
     --text: #e7ebf5;
     --muted: #8a93ac;
-    --accent: #ff6b6b;
-    --accent-dim: #6b2c2c;
+    --accent: #75ff6b;
+    --accent-dim: #316b2c;
     --ok: #5eead4;
-    --sev-critica: #ff5470;
+    --sev-critica: #fa3c3c;
     --sev-alta: #ffa657;
     --sev-media: #f2d675;
     --sev-baixa: #7c8aad;
@@ -35,7 +35,7 @@
     margin: 0;
     background: var(--bg);
     background-image:
-      radial-gradient(ellipse 900px 500px at 50% -10%, rgba(255,107,107,0.08), transparent 60%),
+      radial-gradient(ellipse 900px 500px at 50% -10%, rgba(122, 255, 107, 0.08), transparent 60%),
       radial-gradient(ellipse 700px 400px at 90% 10%, rgba(94,234,212,0.05), transparent 60%);
     color: var(--text);
     font-family: 'Inter', system-ui, sans-serif;
@@ -72,14 +72,14 @@
     position: absolute;
     inset: 0;
     border-radius: 50%;
-    background: conic-gradient(from 0deg, rgba(255,107,107,0.55), transparent 32%);
+    background: conic-gradient(from 0deg, rgba(137, 255, 107, 0.55), transparent 32%);
     animation: spin 4s linear infinite;
     mask-image: radial-gradient(circle, black 60%, transparent 100%);
   }
   @keyframes spin { to { transform: rotate(360deg); } }
   .radar-dot {
     position: absolute; width: 5px; height: 5px; border-radius: 50%;
-    background: var(--accent); box-shadow: 0 0 8px 2px rgba(255,107,107,0.7);
+    background: var(--accent); box-shadow: 0 0 8px 2px rgba(137, 255, 107, 0.7);
     top: 30%; left: 66%; animation: blip 4s ease-in-out infinite;
   }
   @keyframes blip { 0%, 100% { opacity: 0.15; } 50% { opacity: 1; } }
@@ -178,7 +178,20 @@
   .item-detail { font-size: 13.5px; color: #c3cadd; margin: 0; }
 
   .state { text-align: center; color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 60px 0; }
-
+  #run-btn{
+    background: var(--accent);
+    color: #1a0a0a;
+    height: 50px;
+    width: 100%;
+    border: none;
+    border-radius: 8px;
+    padding: 0 16px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
   footer {
     margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--panel-border);
     font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--muted); text-align: center;
@@ -206,10 +219,9 @@
     <div class="run-box">
       <div class="label">Auditar outro repositório</div>
       <div class="run-row">
-        <input id="repo-input" type="text" placeholder="https://github.com/usuario/repositorio" />
         <button id="run-btn">Preparar varredura</button>
       </div>
-      <p class="run-hint" id="run-hint">Cola o link, copiamos pra você e já abrimos a tela certa do Actions — só colar e clicar em "Run workflow".</p>
+      <p class="run-hint" id="run-hint">Abre a tela do Actions — só colar a URL do repositório e clicar em "Run workflow".</p>
     </div>
 
     <div class="summary-box" id="summary-box" style="display:none">
