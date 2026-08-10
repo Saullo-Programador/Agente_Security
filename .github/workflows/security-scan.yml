@@ -4,9 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-  schedule:
-    # 09:00 UTC toda segunda = 06:00 em Brasilia
-    - cron: "0 9 * * 1"
+    branches: [main]
   workflow_dispatch:
     inputs:
       repo_url:
@@ -61,7 +59,7 @@ jobs:
           gitleaks version
 
       - name: Rodar gitleaks
-        run: gitleaks detect --source "${{ steps.scandir.outputs.dir }}" --report-format json --report-path gitleaks-report.json --no-banner || true
+        run: gitleaks detect --source "${{ steps.scandir.outputs.dir }}" --config .gitleaks.toml --report-format json --report-path gitleaks-report.json --no-banner || true
 
       # ---------- Semgrep: analise estatica de codigo (SAST) ----------
       - name: Rodar semgrep

@@ -40,21 +40,39 @@ Deixando o campo vazio, ele volta a escanear este próprio repositório (comport
 
 **Limitação:** só funciona com repositórios **públicos** — não há autenticação configurada para clonar repositórios privados de terceiros.
 
-## Como usar em qualquer repositório seu
+## Auditando um repositório privado (seu ou de terceiros)
 
-1. Copie estas pastas/arquivos para o repositório que você quer auditar:
-   ```
-   .github/workflows/security-scan.yml
-   scripts/
-   requirements.txt
-   ```
-2. Adicione o secret `GEMINI_API_KEY` em **Settings → Secrets and
-   variables → Actions** (chave grátis em [aistudio.google.com/apikey](https://aistudio.google.com/apikey)).
-3. Rode manualmente pela aba **Actions → Radar de Seguranca → Run workflow**,
-   ou espere o próximo push/PR/segunda-feira.
+Para repositórios **privados**, o campo `repo_url` acima não serve — em vez disso, copie estes 4 itens para a raiz do repositório que você quer auditar:
 
-Sem a `GEMINI_API_KEY`, o agente ainda funciona — só o resumo executivo em
-português fica desativado, a lista de achados continua completa.
+```
+.github/workflows/security-scan.yml
+scripts/
+requirements.txt
+.gitleaks.toml
+```
+
+Ele deve ficar assim:
+
+```
+seu-repo/
+├── .github/
+│   └── workflows/
+│       └── security-scan.yml
+├── scripts/
+│   ├── aggregate.py
+│   ├── summarize.py
+│   └── gate.py
+├── requirements.txt
+└── .gitleaks.toml
+```
+
+Depois:
+
+1. Adicione o secret `GEMINI_API_KEY` nesse repositório (**Settings → Secrets and variables → Actions**, chave grátis em [aistudio.google.com/apikey](https://aistudio.google.com/apikey)). Sem ela, o agente ainda funciona — só o resumo executivo em português fica desativado, a lista de achados continua completa.
+2. Rode pela aba **Actions → Radar de Seguranca → Run workflow** (ou espere o próximo push/PR/segunda-feira).
+3. O resultado aparece em **`reports/`** — `AAAA-MM-DD.md`, `latest.md` e `latest.json` — direto nesse mesmo repositório.
+
+Isso funciona igual para repositórios públicos ou privados, e é o mesmo caminho pra usar em qualquer outro projeto seu (ex: Cebrac, EdwardApp, LupeApp) — não precisa levar `index.html`, `README.md` nem `reports/`, que fazem parte só deste repositório central. Se quiser uma página própria mostrando o resultado ali também, copie `index.html` e `.nojekyll` e ative o GitHub Pages (em repositório privado, isso exige conta Pro/Team/Enterprise pra ficar visível).
 
 ## Testando este próprio repositório (para recrutadores)
 
@@ -69,6 +87,10 @@ branch → `main` / `(root)`) para ver a versão navegável.
 **Crítica** (segredo exposto) for encontrado — útil para bloquear o merge
 de um Pull Request antes que um segredo vaze para a branch principal.
 Achados Alta/Média/Baixa não bloqueiam, só ficam no relatório.
+
+## Ignorando falsos positivos conhecidos
+
+O arquivo `.gitleaks.toml` já ignora `google-services.json`, `firebase_options.dart` e `GoogleService-Info.plist` — chaves de cliente Firebase, que não são segredo real (ficam públicas em qualquer APK compilado de qualquer forma). Pra ignorar outro arquivo/padrão, adicione uma linha em `paths` nesse arquivo (formato: expressão regular).
 
 ## Estrutura
 
@@ -88,4 +110,3 @@ index.html        # pagina do GitHub Pages
 ## Licença
 
 MIT.
-#

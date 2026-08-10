@@ -1,0 +1,11 @@
+[extend]
+# importa todas as regras padrao do gitleaks e so adiciona a allowlist abaixo por cima
+useDefault = true
+
+[allowlist]
+description = "Ignora arquivos de configuracao do Firebase - as chaves ali sao feitas para estar no cliente (identificam o projeto, nao autenticam sozinhas) e ja ficam publicas em qualquer APK compilado"
+paths = [
+  '''google-services\.json''',
+  '''firebase_options\.dart''',
+  '''GoogleService-Info\.plist''',
+]
