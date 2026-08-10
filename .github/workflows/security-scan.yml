@@ -4,8 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
   schedule:
+    # 09:00 UTC toda segunda = 06:00 em Brasilia
     - cron: "0 9 * * 1"
   workflow_dispatch:
     inputs:
@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: write
+  security-events: write
 
 jobs:
   varredura:
@@ -60,30 +61,57 @@ jobs:
           sudo mv gitleaks /usr/local/bin/
           gitleaks version
 
+      - name: Preparar pasta dos SARIFs (aba Security do GitHub)
+        run: mkdir -p sarif-results
+
       - name: Rodar gitleaks
         run: gitleaks detect --source "${{ steps.scandir.outputs.dir }}" --config .gitleaks.toml --report-format json --report-path gitleaks-report.json --no-banner || true
 
+      - name: Gerar SARIF do gitleaks
+        run: gitleaks detect --source "${{ steps.scandir.outputs.dir }}" --config .gitleaks.toml --report-format sarif --report-path sarif-results/gitleaks.sarif --no-banner || true
+
       # ---------- Semgrep: analise estatica de codigo (SAST) ----------
+      # Conjuntos curados de regras (OWASP Top 10, CWE Top 25, auditoria geral)
+      # em vez do --config=auto generico - cobertura mais rigorosa e reconhecida.
       - name: Rodar semgrep
-        run: semgrep --config=auto --json --output=semgrep-report.json "${{ steps.scandir.outputs.dir }}" || true
+        run: semgrep --config=p/owasp-top-ten --config=p/cwe-top-25 --config=p/security-audit --json --output=semgrep-report.json "${{ steps.scandir.outputs.dir }}" || true
 
-      # ---------- Dependencias vulneraveis (Python) ----------
-      - name: Rodar pip-audit
-        run: |
-          REQ_FILE=$(find "${{ steps.scandir.outputs.dir }}" -name "requirements.txt" | head -n 1)
-          if [ -n "$REQ_FILE" ]; then
-            pip-audit -r "$REQ_FILE" -f json -o pip-audit-report.json || true
-          fi
+      - name: Gerar SARIF do semgrep
+        run: semgrep --config=p/owasp-top-ten --config=p/cwe-top-25 --config=p/security-audit --sarif --output=sarif-results/semgrep.sarif "${{ steps.scandir.outputs.dir }}" || true
 
-      # ---------- Dependencias vulneraveis (Node) ----------
-      - name: Rodar npm audit
-        run: |
-          PKG_JSON=$(find "${{ steps.scandir.outputs.dir }}" -name package.json -not -path '*/node_modules/*' | head -n 1)
-          if [ -n "$PKG_JSON" ]; then
-            PKG_DIR=$(dirname "$PKG_JSON")
-            (cd "$PKG_DIR" && npm install --package-lock-only --ignore-scripts >/dev/null 2>&1) || true
-            (cd "$PKG_DIR" && npm audit --json > "$GITHUB_WORKSPACE/npm-audit-report.json") || true
-          fi
+      # ---------- Dependencias vulneraveis (SCA ampliada) ----------
+      # Trivy cobre bem mais ecossistemas que pip-audit/npm audit sozinhos -
+      # inclui Python, Node, Dart/Flutter (pubspec.lock), Go, Docker, etc.
+      - name: Rodar trivy (relatorio em json)
+        # Pinado pelo commit (nao pela tag) por seguranca: em marco/2026 o
+        # trivy-action sofreu um ataque de supply chain onde quase todas as
+        # tags de versao foram reescritas com um roubador de credenciais.
+        # ed142fd = v0.36.0, versao publicada e verificada apos o incidente.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          scan-type: fs
+          scan-ref: ${{ steps.scandir.outputs.dir }}
+          format: json
+          output: trivy-report.json
+          severity: "CRITICAL,HIGH,MEDIUM"
+          exit-code: "0"
+
+      - name: Gerar SARIF do trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          scan-type: fs
+          scan-ref: ${{ steps.scandir.outputs.dir }}
+          format: sarif
+          output: sarif-results/trivy.sarif
+          severity: "CRITICAL,HIGH,MEDIUM"
+          exit-code: "0"
+
+      - name: Enviar achados para a aba Security do GitHub
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: sarif-results
+          category: radar-seguranca
 
       # ---------- Agregar + IA prioriza e traduz ----------
       - name: Agregar achados

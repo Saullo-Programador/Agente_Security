@@ -1,7 +1,7 @@
 """
-Le gitleaks-report.json, semgrep-report.json, pip-audit-report.json e/ou
-npm-audit-report.json (os que existirem) e escreve findings.json com uma
-lista normalizada de achados, prontos para a etapa de resumo por IA.
+Le gitleaks-report.json, semgrep-report.json e trivy-report.json (os que
+existirem) e escreve findings.json com uma lista normalizada de achados,
+prontos para a etapa de resumo por IA.
 
 Importante: nunca inclui o valor do segredo em si (campo Secret/Match do
 gitleaks) no output - so o local (arquivo/linha) e a regra que bateu.
@@ -68,62 +68,40 @@ def parse_semgrep():
     return findings
 
 
-def parse_pip_audit():
-    data = safe_load("pip-audit-report.json")
+TRIVY_SEVERITY_MAP = {
+    "CRITICAL": "Critica",
+    "HIGH": "Alta",
+    "MEDIUM": "Media",
+    "LOW": "Baixa",
+    "UNKNOWN": "Baixa",
+}
+
+
+def parse_trivy():
+    data = safe_load("trivy-report.json")
     if not data:
         return []
-    deps = data if isinstance(data, list) else data.get("dependencies", [])
     findings = []
-    for dep in deps:
-        for vuln in dep.get("vulns", []):
-            fixes = ", ".join(vuln.get("fix_versions", []) or []) or "sem correcao publicada"
+    for result in data.get("Results", []) or []:
+        target = result.get("Target", "?")
+        for vuln in result.get("Vulnerabilities", []) or []:
+            fixed = vuln.get("FixedVersion") or "sem correcao publicada"
+            texto = (vuln.get("Title") or vuln.get("Description") or "")[:300]
             findings.append(
                 {
-                    "tool": "pip-audit",
+                    "tool": "trivy",
                     "category": "Dependencia vulneravel",
-                    "severity": "Alta",
-                    "title": f"{dep.get('name')} {dep.get('version')} - {vuln.get('id')}",
-                    "location": "requirements.txt",
-                    "detail": f"{vuln.get('description', '')} Correcao: {fixes}",
+                    "severity": TRIVY_SEVERITY_MAP.get(vuln.get("Severity", "UNKNOWN"), "Baixa"),
+                    "title": f"{vuln.get('PkgName')} {vuln.get('InstalledVersion')} - {vuln.get('VulnerabilityID')}",
+                    "location": target,
+                    "detail": f"{texto} Correcao: {fixed}",
                 }
             )
     return findings
 
 
-NPM_SEVERITY_MAP = {
-    "critical": "Critica",
-    "high": "Alta",
-    "moderate": "Media",
-    "low": "Baixa",
-    "info": "Baixa",
-}
-
-
-def parse_npm_audit():
-    data = safe_load("npm-audit-report.json")
-    if not data:
-        return []
-    vulns = data.get("vulnerabilities", {})
-    findings = []
-    for name, info in vulns.items():
-        findings.append(
-            {
-                "tool": "npm-audit",
-                "category": "Dependencia vulneravel",
-                "severity": NPM_SEVERITY_MAP.get(info.get("severity", "low"), "Baixa"),
-                "title": f"{name} - {info.get('severity', 'desconhecida')}",
-                "location": "package.json",
-                "detail": f"Faixa afetada: {info.get('range', '?')}. "
-                f"Correcao disponivel: {'sim' if info.get('fixAvailable') else 'nao'}",
-            }
-        )
-    return findings
-
-
 def aggregate():
-    findings = (
-        parse_gitleaks() + parse_semgrep() + parse_pip_audit() + parse_npm_audit()
-    )
+    findings = parse_gitleaks() + parse_semgrep() + parse_trivy()
     findings.sort(key=lambda f: SEVERITY_RANK.get(f["severity"], 0), reverse=True)
 
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:

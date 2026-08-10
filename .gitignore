@@ -3,6 +3,6 @@ __pycache__/
 .env
 gitleaks-report.json
 semgrep-report.json
-pip-audit-report.json
-npm-audit-report.json
+trivy-report.json
 findings.json
+sarif-results/

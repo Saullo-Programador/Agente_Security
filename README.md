@@ -10,8 +10,10 @@ e traduzir** os achados, não para "hackear" nada:
 | Scanner | O que detecta |
 |---|---|
 | [gitleaks](https://github.com/gitleaks/gitleaks) | Segredos vazados no histórico do git (chaves de API, senhas, tokens) |
-| [semgrep](https://semgrep.dev) | Padrões de código inseguro (SQL injection, XSS, etc.) — SAST |
-| [pip-audit](https://github.com/pypa/pip-audit) / `npm audit` | Dependências com CVE conhecida |
+| [semgrep](https://semgrep.dev) — regras OWASP Top 10 + CWE Top 25 + security-audit | Padrões de código inseguro (SQL injection, XSS, etc.) — SAST |
+| [Trivy](https://github.com/aquasecurity/trivy) | Dependências com CVE conhecida — cobre Python, Node, Dart/Flutter (pubspec.lock), Go e outros ecossistemas |
+
+Os achados também são enviados em formato **SARIF** para a aba **Security → Code scanning** do próprio GitHub — os mesmos achados aparecem lá com anotação direto na linha do Pull Request, do jeito que o GitHub Advanced Security funciona nativamente (grátis para repositório público).
 
 O resultado é commitado em `reports/` e publicado numa página simples via
 GitHub Pages, sempre mostrando a **última varredura**.
@@ -88,6 +90,23 @@ branch → `main` / `(root)`) para ver a versão navegável.
 de um Pull Request antes que um segredo vaze para a branch principal.
 Achados Alta/Média/Baixa não bloqueiam, só ficam no relatório.
 
+## Limitações conhecidas
+
+Nenhuma ferramenta usada aqui foi feita pensando em Dart/Flutter como prioridade — vale saber exatamente o que isso significa antes de confiar cegamente no relatório:
+
+- **Semgrep (SAST)**: a cobertura de regras pra Dart é bem mais fraca que para JavaScript, Python ou Java. Padrões de código inseguro *dentro* do seu código Dart/Flutter (`lib/**/*.dart`) provavelmente não são pegos — o motor de regras simplesmente não tem muitas regras escritas pra essa linguagem ainda.
+- **Trivy (SCA)**: cobre bem as dependências declaradas em `pubspec.lock` (avisa se algum pacote pub.dev tem CVE conhecida), mas isso é análise de *dependência*, não de *código*.
+- **Gitleaks (segredos)**: funciona igual para qualquer linguagem, já que é baseado em padrões de texto (regex) no código-fonte, não entende sintaxe — essa parte é confiável independente da stack.
+
+Na prática: este agente é forte pra achar **segredos vazados** e **dependências vulneráveis** em projetos Flutter/Android, mas fraco pra achar **bugs de lógica insegura escritos em Dart**. Para esse último ponto, `flutter analyze` e os lints oficiais do Dart continuam sendo a ferramenta certa — este agente não substitui isso, complementa.
+
+## Onde ver os resultados
+
+Existem dois lugares, com o mesmo conteúdo em formatos diferentes:
+
+- **`reports/`** (Markdown/JSON) + a página do GitHub Pages — visão resumida em português, priorizada por IA.
+- **Aba Security → Code scanning alerts** do repositório — visão nativa do GitHub, com anotação direto na linha do código, histórico de alertas, e opção de marcar como "dismissed" (falso positivo, risco aceito, etc). Precisa estar habilitada em **Settings → Code security → Code scanning** (normalmente já vem ativa em repositório público).
+
 ## Ignorando falsos positivos conhecidos
 
 O arquivo `.gitleaks.toml` já ignora `google-services.json`, `firebase_options.dart` e `GoogleService-Info.plist` — chaves de cliente Firebase, que não são segredo real (ficam públicas em qualquer APK compilado de qualquer forma). Pra ignorar outro arquivo/padrão, adicione uma linha em `paths` nesse arquivo (formato: expressão regular).
@@ -96,15 +115,16 @@ O arquivo `.gitleaks.toml` já ignora `google-services.json`, `firebase_options.
 
 ```
 scripts/
-  aggregate.py    # normaliza a saida dos 3 scanners num formato unico
+  aggregate.py    # normaliza a saida de gitleaks/semgrep/trivy num formato unico
   summarize.py    # IA prioriza/traduz + monta o relatorio (md e json)
   gate.py         # falha o job se houver achado critico
 .github/workflows/
-  security-scan.yml
+  security-scan.yml   # roda os scanners, gera SARIF, sobe pra aba Security, commita reports/
 reports/
   AAAA-MM-DD.md
   latest.md / latest.json
 index.html        # pagina do GitHub Pages
+.gitleaks.toml     # allowlist de falsos positivos conhecidos
 ```
 
 ## Licença
